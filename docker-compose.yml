@@ -1,0 +1,14 @@
+services:
+  board-game-catalog:
+    build:
+      context: .
+    container_name: board-game-catalog
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      CATALOG_HOST: 0.0.0.0
+      CATALOG_PORT: 8000
+    volumes:
+      - ./data:/app/data
+      - ./service/config:/app/service/config

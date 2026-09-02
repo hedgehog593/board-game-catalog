@@ -58,6 +58,48 @@ The first run creates:
 data\board_games.sqlite
 ```
 
+## Run With Docker Desktop
+
+From this folder:
+
+```powershell
+docker compose up -d --build
+```
+
+Open:
+
+```text
+http://127.0.0.1:8000
+```
+
+The Docker container is named `board-game-catalog` and uses `restart: unless-stopped`, so Docker Desktop will restart it automatically when Docker starts. The container stores catalog data and admin config in the local `data` and `service\config` folders through bind mounts.
+
+To have it come back after a computer restart, enable Docker Desktop's setting to start when you sign in. Once Docker Desktop starts, the `restart: unless-stopped` policy brings the `board-game-catalog` container back up automatically.
+
+To access the site from another device on your home network, use the hosting computer's LAN address. For example:
+
+```text
+http://192.168.1.3:8000
+```
+
+Windows Firewall must allow inbound TCP traffic on port `8000` for the private network profile. From an elevated PowerShell window:
+
+```powershell
+.\tools\open_firewall_port.ps1
+```
+
+Or run the rule directly:
+
+```powershell
+netsh advfirewall firewall add rule name="Board Game Catalog Docker 8000" dir=in action=allow protocol=TCP localport=8000 profile=private
+```
+
+To stop it manually:
+
+```powershell
+docker compose down
+```
+
 ## API
 
 ```text
