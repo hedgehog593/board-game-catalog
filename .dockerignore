@@ -1,0 +1,13 @@
+.git/
+__pycache__/
+*.py[cod]
+
+data/*.sqlite
+data/*.sqlite-*
+data/bg_ranks.csv
+data/bgg_metadata.csv
+data/manual_metadata.csv
+data/manual_metadata_template.csv
+
+service/config/admin_password.txt
+service/config/session_secret.txt

@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import io
 import json
+import os
 import secrets
 import zlib
 from http import cookies
@@ -23,8 +24,8 @@ from catalog_db import (
 )
 from metadata_csv import DEFAULT_UPLOAD_PATH, load_metadata_catalog, normalize_name
 
-HOST = "127.0.0.1"
-PORT = 8000
+HOST = os.environ.get("CATALOG_HOST", "127.0.0.1")
+PORT = int(os.environ.get("CATALOG_PORT", "8000"))
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
 CONFIG_DIR = Path(__file__).resolve().parent / "config"
 PASSWORD_FILE = CONFIG_DIR / "admin_password.txt"
