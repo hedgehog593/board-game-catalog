@@ -1,0 +1,110 @@
+[
+  {
+    "bgg_id": 13,
+    "name": "CATAN",
+    "min_players": 3,
+    "max_players": 4,
+    "genres": ["Economic", "Negotiation", "Trading"],
+    "complexity": 2.29,
+    "source_url": "https://boardgamegeek.com/boardgame/13/catan"
+  },
+  {
+    "bgg_id": 9209,
+    "name": "Ticket to Ride",
+    "min_players": 2,
+    "max_players": 5,
+    "genres": ["Trains", "Route Building", "Family"],
+    "complexity": 1.83,
+    "source_url": "https://boardgamegeek.com/boardgame/9209/ticket-to-ride"
+  },
+  {
+    "bgg_id": 822,
+    "name": "Carcassonne",
+    "min_players": 2,
+    "max_players": 5,
+    "genres": ["City Building", "Medieval", "Territory Building"],
+    "complexity": 1.89,
+    "source_url": "https://boardgamegeek.com/boardgame/822/carcassonne"
+  },
+  {
+    "bgg_id": 30549,
+    "name": "Pandemic",
+    "min_players": 2,
+    "max_players": 4,
+    "genres": ["Cooperative", "Medical", "Strategy"],
+    "complexity": 2.40,
+    "source_url": "https://boardgamegeek.com/boardgame/30549/pandemic"
+  },
+  {
+    "bgg_id": 230802,
+    "name": "Azul",
+    "min_players": 2,
+    "max_players": 4,
+    "genres": ["Abstract Strategy", "Pattern Building", "Tile Placement"],
+    "complexity": 1.76,
+    "source_url": "https://boardgamegeek.com/boardgame/230802/azul"
+  },
+  {
+    "bgg_id": 266192,
+    "name": "Wingspan",
+    "min_players": 1,
+    "max_players": 5,
+    "genres": ["Animals", "Card Game", "Engine Building"],
+    "complexity": 2.47,
+    "source_url": "https://boardgamegeek.com/boardgame/266192/wingspan"
+  },
+  {
+    "bgg_id": 68448,
+    "name": "7 Wonders",
+    "min_players": 2,
+    "max_players": 7,
+    "genres": ["Ancient", "Card Drafting", "Civilization"],
+    "complexity": 2.31,
+    "source_url": "https://boardgamegeek.com/boardgame/68448/7-wonders"
+  },
+  {
+    "bgg_id": 178900,
+    "name": "Codenames",
+    "min_players": 2,
+    "max_players": 8,
+    "genres": ["Deduction", "Party Game", "Word Game"],
+    "complexity": 1.27,
+    "source_url": "https://boardgamegeek.com/boardgame/178900/codenames"
+  },
+  {
+    "bgg_id": 167791,
+    "name": "Terraforming Mars",
+    "min_players": 1,
+    "max_players": 5,
+    "genres": ["Economic", "Science Fiction", "Territory Building"],
+    "complexity": 3.26,
+    "source_url": "https://boardgamegeek.com/boardgame/167791/terraforming-mars"
+  },
+  {
+    "bgg_id": 174430,
+    "name": "Gloomhaven",
+    "min_players": 1,
+    "max_players": 4,
+    "genres": ["Adventure", "Fantasy", "Campaign"],
+    "complexity": 3.91,
+    "source_url": "https://boardgamegeek.com/boardgame/174430/gloomhaven"
+  },
+  {
+    "bgg_id": 169786,
+    "name": "Scythe",
+    "min_players": 1,
+    "max_players": 5,
+    "genres": ["Economic", "Fighting", "Territory Building"],
+    "complexity": 3.46,
+    "source_url": "https://boardgamegeek.com/boardgame/169786/scythe"
+  },
+  {
+    "bgg_id": 237182,
+    "name": "Root",
+    "min_players": 2,
+    "max_players": 4,
+    "genres": ["Adventure", "Wargame", "Asymmetric"],
+    "complexity": 3.80,
+    "source_url": "https://boardgamegeek.com/boardgame/237182/root"
+  }
+]

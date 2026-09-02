@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Board Game Catalog Admin</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="Site navigation">
+      <a class="nav-link" href="index.html">Finder</a>
+      <a class="nav-link" href="admin.html" aria-current="page">Admin</a>
+    </nav>
+    <main class="shell">
+      <section class="admin-header">
+        <div>
+          <p class="eyebrow">Private tools</p>
+          <h1>Catalog Admin</h1>
+        </div>
+        <button type="button" id="logout" hidden>Log out</button>
+      </section>
+
+      <section id="loginPanel" class="login-panel">
+        <form id="loginForm" class="login-form">
+          <label>
+            Admin password
+            <input id="password" name="password" type="password" autocomplete="current-password">
+          </label>
+          <button type="submit">Unlock</button>
+        </form>
+        <p id="loginStatus" class="status-text">Use the password from the backend config file.</p>
+      </section>
+
+      <section id="adminPanel" hidden>
+        <section class="import-bar" aria-label="Owned game import">
+          <div>
+            <strong>Owned games</strong>
+            <span id="importStatus">Upload your master CSV. Each import replaces the current catalog.</span>
+          </div>
+          <form id="importForm" class="import-form">
+            <input id="csvFile" name="file" type="file" accept=".csv,text/csv">
+            <button type="submit">Import CSV</button>
+          </form>
+        </section>
+
+        <section class="import-bar" aria-label="BGG metadata import">
+          <div>
+            <strong>BGG metadata</strong>
+            <span id="metadataStatus">Upload metadata first, then import your owned games.</span>
+          </div>
+          <form id="metadataForm" class="import-form">
+            <input id="metadataFile" name="file" type="file" accept=".csv,text/csv">
+            <button type="submit">Save Metadata CSV</button>
+          </form>
+        </section>
+
+        <section class="summary" aria-live="polite">
+          <strong id="resultCount">0 games</strong>
+          <span id="activeFilters">Full catalog.</span>
+        </section>
+
+        <section class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Players</th>
+                <th>Genre</th>
+                <th>Complexity</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody id="games"></tbody>
+          </table>
+        </section>
+      </section>
+    </main>
+
+    <script src="admin.js"></script>
+  </body>
+</html>

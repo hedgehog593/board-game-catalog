@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Board Game Randomizer</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="Site navigation">
+      <a class="nav-link" href="index.html">Finder</a>
+      <a class="nav-link" href="admin.html">Admin</a>
+    </nav>
+    <main class="shell randomizer-shell">
+      <section class="randomizer-header" aria-label="Board game randomizer">
+        <div>
+          <p class="eyebrow">Game night picker</p>
+          <h1>Randomizer</h1>
+        </div>
+      </section>
+
+      <section class="randomizer-filter-panel" aria-label="Randomizer filters">
+        <form id="randomizerFilters" class="randomizer-controls">
+          <label>
+            Player count up to
+            <select id="playerLimit" name="playerLimit">
+              <option value="">Any count</option>
+            </select>
+          </label>
+          <fieldset class="genre-filter">
+            <legend>Genres</legend>
+            <details class="genre-dropdown" id="genreDropdown">
+              <summary id="genreSummary">Any genre</summary>
+              <div id="genreOptions" class="genre-options"></div>
+            </details>
+          </fieldset>
+          <label>
+            Complexity
+            <select id="complexityRange" name="complexityRange">
+              <option value="">Any complexity</option>
+              <option value="0-2">Light (0-2)</option>
+              <option value="2-3">Medium (2-3)</option>
+              <option value="3-4">Heavy (3-4)</option>
+              <option value="4-5">Very heavy (4-5)</option>
+            </select>
+          </label>
+          <button type="button" id="randomize">Randomize</button>
+          <button type="button" id="clearRandomizer">Reset</button>
+        </form>
+      </section>
+
+      <section class="slot-machine" aria-live="polite">
+        <div class="slot-window">
+          <div class="slot-reel" id="slotReel">
+            <div class="slot-item">Ready to spin</div>
+          </div>
+        </div>
+        <div class="winner-card" id="winnerCard" hidden>
+          <p class="eyebrow">Tonight's pick</p>
+          <h2 id="winnerName"></h2>
+          <dl>
+            <div>
+              <dt>Players</dt>
+              <dd id="winnerPlayers"></dd>
+            </div>
+            <div>
+              <dt>Genres</dt>
+              <dd id="winnerGenres"></dd>
+            </div>
+            <div>
+              <dt>Complexity</dt>
+              <dd id="winnerComplexity"></dd>
+            </div>
+          </dl>
+          <a id="winnerSource" href="#" target="_blank" rel="noreferrer" hidden>Open on BGG</a>
+        </div>
+      </section>
+
+      <section class="summary" aria-live="polite">
+        <strong id="candidateCount">0 games</strong>
+        <span id="randomizerStatus">Loading your catalog.</span>
+      </section>
+    </main>
+
+    <script src="randomizer.js"></script>
+  </body>
+</html>

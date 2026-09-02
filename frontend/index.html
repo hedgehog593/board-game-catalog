@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Board Game Catalog</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="Site navigation">
+      <span></span>
+      <a class="nav-link" href="admin.html">Admin</a>
+    </nav>
+    <main class="shell">
+      <section class="toolbar" aria-label="Board game filters">
+        <div>
+          <p class="eyebrow">Local catalog</p>
+          <h1>Board Game Finder</h1>
+          <nav class="page-links" aria-label="Catalog pages">
+            <a class="button-link" href="randomizer.html">Randomizer</a>
+          </nav>
+        </div>
+        <form id="filters" class="filters">
+          <label>
+            Players
+            <input id="players" name="players" type="number" min="1" max="20" placeholder="Any">
+          </label>
+          <label>
+            Genre
+            <select id="genre" name="genre">
+              <option value="">Any genre</option>
+            </select>
+          </label>
+          <label>
+            Complexity
+            <select id="maxComplexity" name="maxComplexity">
+              <option value="">Any weight</option>
+              <option value="2">Light</option>
+              <option value="3">Medium or lighter</option>
+              <option value="4">Heavy or lighter</option>
+            </select>
+          </label>
+          <button type="submit">Find games</button>
+          <button type="button" id="reset">Reset</button>
+        </form>
+      </section>
+
+      <section class="summary" aria-live="polite">
+        <strong id="resultCount">0 games</strong>
+        <span id="activeFilters">Showing the full catalog.</span>
+      </section>
+
+      <section class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Players</th>
+              <th>Genre</th>
+              <th>Complexity</th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody id="games"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
