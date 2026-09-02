@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+
+# Local catalog/runtime data
+data/*.sqlite
+data/*.sqlite-*
+data/bg_ranks.csv
+data/bgg_metadata.csv
+data/manual_metadata.csv
+data/manual_metadata_template.csv
+
+# Local admin credentials/session state
+service/config/admin_password.txt
+service/config/session_secret.txt
