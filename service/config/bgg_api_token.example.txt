@@ -1,0 +1,1 @@
+paste-your-bgg-api-token-here

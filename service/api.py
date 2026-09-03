@@ -22,7 +22,7 @@ from catalog_db import (
     query_games,
     replace_games,
 )
-from metadata_csv import DEFAULT_UPLOAD_PATH, load_metadata_catalog, normalize_name
+from bgg_client import import_games, search_game_id
 
 HOST = os.environ.get("CATALOG_HOST", "127.0.0.1")
 PORT = int(os.environ.get("CATALOG_PORT", "8000"))
@@ -57,11 +57,6 @@ class CatalogHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/health":
             self.send_json({"ok": True, "database": str(DB_PATH)})
             return
-        if parsed.path == "/api/metadata/status":
-            if not self.require_admin():
-                return
-            self.handle_metadata_status()
-            return
         self.serve_static(parsed.path)
 
     def do_POST(self) -> None:
@@ -79,11 +74,6 @@ class CatalogHandler(BaseHTTPRequestHandler):
             if not self.require_admin():
                 return
             self.handle_csv_import()
-            return
-        if parsed.path == "/api/metadata/csv":
-            if not self.require_admin():
-                return
-            self.handle_metadata_upload()
             return
         self.send_error(404)
 
@@ -129,16 +119,6 @@ class CatalogHandler(BaseHTTPRequestHandler):
             headers={"Set-Cookie": f"{ADMIN_COOKIE}=; Path=/; Max-Age=0; SameSite=Strict; HttpOnly"},
         )
 
-    def handle_metadata_status(self) -> None:
-        metadata = load_metadata_catalog()
-        self.send_json(
-            {
-                "available": metadata.available,
-                "source": metadata.source,
-                "records": len(metadata.by_id) or len(metadata.by_name),
-            }
-        )
-
     def handle_csv_import(self) -> None:
         try:
             upload = self.read_uploaded_csv()
@@ -156,34 +136,8 @@ class CatalogHandler(BaseHTTPRequestHandler):
                 "mode": "replace",
                 "imported": len(result["games"]),
                 "matchedOnBgg": result["matched_on_bgg"],
-                "matchedFromMetadata": result["matched_from_metadata"],
-                "metadataSource": result["metadata_source"],
                 "unmatched": result["unmatched"],
                 "bggUnavailable": False,
-            }
-        )
-
-    def handle_metadata_upload(self) -> None:
-        try:
-            upload = self.read_uploaded_csv()
-            rows = list(csv.DictReader(io.StringIO(upload)))
-            if not rows:
-                raise ValueError("The metadata CSV must include a header row and at least one game.")
-            DEFAULT_UPLOAD_PATH.parent.mkdir(parents=True, exist_ok=True)
-            DEFAULT_UPLOAD_PATH.write_text(upload, encoding="utf-8")
-            metadata = load_metadata_catalog()
-        except ValueError as error:
-            self.send_json({"error": str(error)}, status=400)
-            return
-        except Exception as error:
-            self.send_json({"error": f"Metadata upload failed: {error}"}, status=502)
-            return
-
-        self.send_json(
-            {
-                "saved": True,
-                "source": str(DEFAULT_UPLOAD_PATH),
-                "records": len(metadata.by_id) or len(metadata.by_name),
             }
         )
 
@@ -329,9 +283,9 @@ def games_from_csv(csv_text: str) -> dict:
     if not rows:
         raise ValueError("The CSV must include a header row and at least one game.")
 
-    metadata = load_metadata_catalog()
     cached_games: list[dict] = []
-    metadata_games: list[dict] = []
+    bgg_ids: list[int] = []
+    rows_by_bgg_id: dict[int, tuple[dict[str, str], str | None]] = {}
     fallback_games: list[dict] = []
     unmatched: list[str] = []
 
@@ -341,37 +295,45 @@ def games_from_csv(csv_text: str) -> dict:
         bgg_id_text = first_value(normalized, "bggid", "bgg_id", "bbgid", "bbg_id", "objectid", "object_id")
         bgg_id = parse_bgg_id(bgg_id_text) if bgg_id_text else None
 
-        metadata_game = None
         if bgg_id is not None:
-            metadata_game = metadata.by_id.get(bgg_id)
-        if metadata_game is None and name:
-            metadata_game = metadata.by_name.get(normalize_name(name))
-
-        if metadata_game is not None:
-            metadata_games.append(merge_owned_row(metadata_game, normalized, name, bgg_id))
+            bgg_ids.append(bgg_id)
+            rows_by_bgg_id[bgg_id] = (normalized, name)
             continue
 
         if not name:
             continue
 
-        cached = find_game_by_name(name)
-        if cached and has_bgg_metadata(cached):
-            cached_games.append(api_game_to_record(cached))
+        found_bgg_id = search_game_id(name)
+        if found_bgg_id is not None:
+            bgg_ids.append(found_bgg_id)
+            rows_by_bgg_id[found_bgg_id] = (normalized, name)
             continue
 
         unmatched.append(name)
         fallback_games.append(fallback_game_from_csv(name, normalized, bgg_id=bgg_id))
 
-    if not metadata_games and not cached_games and not fallback_games:
+    if not bgg_ids and not fallback_games:
         raise ValueError("The CSV must include a name, game name, title, game, or bgg_id column.")
 
-    games = dedupe_games(cached_games + metadata_games + fallback_games)
+    bgg_games = []
+    if bgg_ids:
+        imported_games = import_games(bgg_ids)
+        for game in imported_games:
+            row, owned_name = rows_by_bgg_id.get(game["bgg_id"], ({}, None))
+            bgg_games.append(merge_owned_row(game, row, owned_name, game["bgg_id"]))
+
+    for bgg_id, (row, name) in rows_by_bgg_id.items():
+        if any(game["bgg_id"] == bgg_id for game in bgg_games):
+            continue
+        if name:
+            unmatched.append(name)
+            fallback_games.append(fallback_game_from_csv(name, row, bgg_id=bgg_id))
+
+    games = dedupe_games(cached_games + bgg_games + fallback_games)
     return {
         "games": games,
-        "matched_on_bgg": len(cached_games) + len(metadata_games),
-        "matched_from_metadata": len(metadata_games),
+        "matched_on_bgg": len(cached_games) + len(bgg_games),
         "unmatched": unmatched,
-        "metadata_source": metadata.source,
     }
 
 

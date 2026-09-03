@@ -6,11 +6,8 @@ const els = {
   loginStatus: document.querySelector("#loginStatus"),
   logout: document.querySelector("#logout"),
   importForm: document.querySelector("#importForm"),
-  metadataForm: document.querySelector("#metadataForm"),
   csvFile: document.querySelector("#csvFile"),
-  metadataFile: document.querySelector("#metadataFile"),
   importStatus: document.querySelector("#importStatus"),
-  metadataStatus: document.querySelector("#metadataStatus"),
   games: document.querySelector("#games"),
   resultCount: document.querySelector("#resultCount"),
   activeFilters: document.querySelector("#activeFilters")
@@ -29,7 +26,6 @@ async function checkAuth() {
   const data = await api("/api/admin/status", { method: "POST" });
   setAuthenticated(data.authenticated);
   if (data.authenticated) {
-    await loadMetadataStatus();
     await loadGames();
   }
 }
@@ -50,7 +46,6 @@ async function login() {
   setAuthenticated(data.authenticated);
   els.password.value = "";
   els.loginStatus.textContent = "";
-  await loadMetadataStatus();
   await loadGames();
 }
 
@@ -58,25 +53,6 @@ async function logout() {
   await api("/api/admin/logout", { method: "POST" });
   setAuthenticated(false);
   els.loginStatus.textContent = "Logged out.";
-}
-
-async function uploadMetadataCsv() {
-  const file = els.metadataFile.files[0];
-  if (!file) {
-    els.metadataStatus.textContent = "Choose the BGG metadata CSV first.";
-    return;
-  }
-
-  els.metadataStatus.textContent = "Saving metadata CSV...";
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const data = await api("/api/metadata/csv", {
-    method: "POST",
-    body: formData
-  });
-
-  els.metadataStatus.textContent = `Metadata ready: ${data.records} records from ${data.source}.`;
 }
 
 async function importCsv() {
@@ -96,16 +72,8 @@ async function importCsv() {
   });
 
   const unmatched = data.unmatched.length ? ` ${data.unmatched.length} unmatched.` : "";
-  const metadataNote = data.metadataSource ? ` Metadata: ${data.metadataSource}.` : " No metadata CSV found; unmatched rows used CSV-only details.";
-  els.importStatus.textContent = `Replaced catalog with ${data.imported} owned games. ${data.matchedFromMetadata} matched from metadata CSV.${unmatched}${metadataNote}`;
+  els.importStatus.textContent = `Replaced catalog with ${data.imported} owned games. ${data.matchedOnBgg} matched from BGG.${unmatched}`;
   await loadGames();
-}
-
-async function loadMetadataStatus() {
-  const data = await api("/api/metadata/status");
-  els.metadataStatus.textContent = data.available
-    ? `Metadata ready: ${data.records} records from ${data.source}.`
-    : "Upload metadata first, then import your owned games.";
 }
 
 async function loadGames() {
@@ -164,13 +132,6 @@ els.importForm.addEventListener("submit", (event) => {
   event.preventDefault();
   importCsv().catch((error) => {
     els.importStatus.textContent = error.message;
-  });
-});
-
-els.metadataForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  uploadMetadataCsv().catch((error) => {
-    els.metadataStatus.textContent = error.message;
   });
 });
 
