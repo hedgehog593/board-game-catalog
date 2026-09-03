@@ -12,3 +12,4 @@ data/manual_metadata_template.csv
 # Local admin credentials/session state
 service/config/admin_password.txt
 service/config/session_secret.txt
+service/config/bgg_api_token.txt

@@ -6,11 +6,14 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 BGG_THING_URL = "https://boardgamegeek.com/xmlapi2/thing"
 BGG_COLLECTION_URL = "https://boardgamegeek.com/xmlapi2/collection"
 BGG_SEARCH_URL = "https://boardgamegeek.com/xmlapi2/search"
 MAX_IDS_PER_REQUEST = 20
+CONFIG_DIR = Path(__file__).resolve().parent / "config"
+TOKEN_FILE = CONFIG_DIR / "bgg_api_token.txt"
 
 
 def fetch_xml(url: str, retries: int = 4) -> ET.Element:
@@ -32,10 +35,19 @@ def fetch_xml(url: str, retries: int = 4) -> ET.Element:
 
 def request_headers() -> dict[str, str]:
     headers = {"User-Agent": "LocalBoardGameCatalog/0.2"}
-    token = os.environ.get("BGG_API_TOKEN")
+    token = bgg_api_token()
     if token:
         headers["Authorization"] = f"Bearer {token}"
     return headers
+
+
+def bgg_api_token() -> str | None:
+    token = os.environ.get("BGG_API_TOKEN")
+    if token:
+        return token.strip()
+    if TOKEN_FILE.exists():
+        return TOKEN_FILE.read_text(encoding="utf-8").strip()
+    return None
 
 
 def chunks(values: list[int], size: int) -> list[list[int]]:
