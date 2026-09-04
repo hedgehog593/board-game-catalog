@@ -6,7 +6,7 @@ Local-first board game catalog starter with:
 - Python standard-library API service.
 - Static frontend that can be served by the Python service or by IIS.
 - BoardGameGeek XML API metadata enrichment using a local token file.
-- Browser CSV upload for replacing the catalog with your owned games.
+- Browser CSV upload for syncing the catalog with your owned games.
 
 ## Why SQLite
 
@@ -118,6 +118,7 @@ GET /api/games?players=4
 GET /api/games?genre=Economic
 GET /api/games?players=4&genre=Economic&maxComplexity=3
 POST /api/import/csv
+POST /api/bgg/refresh
 POST /api/admin/login
 POST /api/admin/logout
 POST /api/admin/status
@@ -147,9 +148,18 @@ Supported columns:
 - `name`, `game name`, `title`, `game`, or `boardgame`
 - optional fallback columns if BGG cannot match a game: `min_players`, `max_players`, `genre`, `complexity`
 
-`bgg_id` is preferred because BoardGameGeek names can be ambiguous. If the CSV only includes names, the app searches BoardGameGeek by name, then imports the metadata for the matched game.
+`bgg_id` is preferred because BoardGameGeek names can be ambiguous. The CSV import syncs the owned-game list and keeps any BGG metadata that is already in the catalog.
 
-Uploading a CSV always replaces the current catalog with the uploaded owned-game list. Games removed from your master CSV are removed from the app on the next import, and duplicate rows in the CSV are collapsed into one catalog entry.
+Uploading a CSV syncs the app to your master owned-game list. Existing BGG metadata is preserved, changed rows are updated, and games removed from your master CSV are removed from the app after the import is parsed.
+
+Use the Admin `Refresh BGG Data` button to update current catalog games that already have BGG IDs without re-uploading the CSV.
+
+## Useful Tips
+
+- Treat your spreadsheet as the master ownership list. Export it to CSV, then import it from Admin when games are added, renamed, or removed.
+- CSV import syncs ownership only. It preserves existing BGG metadata, but it does not pull fresh BGG metadata by itself.
+- After importing the CSV, click `Refresh BGG Data` in Admin to fetch players, genres, complexity, images, and BGG source links for rows that have BGG IDs.
+- Keep BGG IDs in the CSV where possible. Title-only matching is useful, but BGG IDs avoid ambiguous names and edition mix-ups.
 
 ## IIS Starting Point
 

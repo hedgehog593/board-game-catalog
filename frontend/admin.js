@@ -6,8 +6,10 @@ const els = {
   loginStatus: document.querySelector("#loginStatus"),
   logout: document.querySelector("#logout"),
   importForm: document.querySelector("#importForm"),
+  refreshBgg: document.querySelector("#refreshBgg"),
   csvFile: document.querySelector("#csvFile"),
   importStatus: document.querySelector("#importStatus"),
+  refreshStatus: document.querySelector("#refreshStatus"),
   games: document.querySelector("#games"),
   resultCount: document.querySelector("#resultCount"),
   activeFilters: document.querySelector("#activeFilters")
@@ -72,8 +74,24 @@ async function importCsv() {
   });
 
   const unmatched = data.unmatched.length ? ` ${data.unmatched.length} unmatched.` : "";
-  els.importStatus.textContent = `Replaced catalog with ${data.imported} owned games. ${data.matchedOnBgg} matched from BGG.${unmatched}`;
+  const removed = data.removed ? ` ${data.removed} removed because they are no longer in the master CSV.` : "";
+  els.importStatus.textContent = `Synced ${data.imported} owned games. ${data.matchedOnBgg} matched from BGG.${unmatched}${removed}`;
   await loadGames();
+}
+
+async function refreshBggData() {
+  els.refreshBgg.disabled = true;
+  els.refreshStatus.textContent = "Fetching BoardGameGeek metadata...";
+
+  try {
+    const data = await api("/api/bgg/refresh", { method: "POST" });
+    const unmatched = data.unmatched.length ? ` ${data.unmatched.length} unmatched.` : "";
+    const skipped = data.skippedMissingIds ? ` ${data.skippedMissingIds} skipped because they do not have BGG IDs yet.` : "";
+    els.refreshStatus.textContent = `Updated ${data.updated} games from BGG.${unmatched}${skipped}`;
+    await loadGames();
+  } finally {
+    els.refreshBgg.disabled = false;
+  }
 }
 
 async function loadGames() {
@@ -132,6 +150,12 @@ els.importForm.addEventListener("submit", (event) => {
   event.preventDefault();
   importCsv().catch((error) => {
     els.importStatus.textContent = error.message;
+  });
+});
+
+els.refreshBgg.addEventListener("click", () => {
+  refreshBggData().catch((error) => {
+    els.refreshStatus.textContent = error.message;
   });
 });
 

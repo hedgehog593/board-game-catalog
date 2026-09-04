@@ -8,13 +8,21 @@ const state = {
 const REEL_TITLE_LIMIT = 42;
 const WINNER_TITLE_LIMIT = 58;
 
+const complexityOptions = [
+  { value: "", label: "Any complexity" },
+  { value: "0-2", label: "Light (0-2)" },
+  { value: "2-3", label: "Medium (2-3)" },
+  { value: "3-4", label: "Heavy (3-4)" },
+  { value: "4-5", label: "Very heavy (4-5)" }
+];
+
 const els = {
   form: document.querySelector("#randomizerFilters"),
   playerLimit: document.querySelector("#playerLimit"),
   complexityRange: document.querySelector("#complexityRange"),
   randomize: document.querySelector("#randomize"),
+  randomizeHandle: document.querySelector("#randomizeHandle"),
   reset: document.querySelector("#clearRandomizer"),
-  genreDropdown: document.querySelector("#genreDropdown"),
   genreSummary: document.querySelector("#genreSummary"),
   genreOptions: document.querySelector("#genreOptions"),
   slotReel: document.querySelector("#slotReel"),
@@ -44,62 +52,187 @@ async function loadRandomizer() {
 
   state.genres = genresData.genres;
   state.games = gamesData.games;
-  renderPlayerLimitOptions();
-  renderGenreOptions();
+  initializeCombos();
   renderCandidates();
 }
 
-function renderPlayerLimitOptions() {
-  for (let count = 1; count <= 20; count += 1) {
-    const option = document.createElement("option");
-    option.value = String(count);
-    option.textContent = `${count} ${count === 1 ? "player" : "players"}`;
-    els.playerLimit.append(option);
-  }
-}
+function initializeCombos() {
+  createFilterCombo({
+    name: "playerLimit",
+    input: els.playerLimit,
+    options: playerOptions(),
+    emptyLabel: "Any count",
+    onChange: renderCandidates
+  });
 
-function renderGenreOptions() {
-  els.genreOptions.innerHTML = "";
-  if (!state.genres.length) {
-    els.genreOptions.innerHTML = `<p class="filter-empty">No genre metadata imported yet.</p>`;
-    renderGenreSummary();
-    return;
-  }
+  createFilterCombo({
+    name: "complexityRange",
+    input: els.complexityRange,
+    options: complexityOptions,
+    emptyLabel: "Any complexity",
+    onChange: renderCandidates
+  });
 
-  for (const genre of state.genres) {
-    const label = document.createElement("label");
-    label.className = "genre-choice";
-    label.innerHTML = `
-      <input type="checkbox" value="${escapeHtml(genre)}">
-      <span>${escapeHtml(genre)}</span>
-    `;
-    const checkbox = label.querySelector("input");
-    checkbox.addEventListener("change", () => {
-      if (checkbox.checked) {
-        state.selectedGenres.add(genre);
-      } else {
-        state.selectedGenres.delete(genre);
-      }
+  createFilterCombo({
+    name: "genres",
+    multi: true,
+    options: state.genres.map((genre) => ({ value: genre, label: genre })),
+    emptyLabel: "Any genre",
+    selectedValues: state.selectedGenres,
+    onChange: () => {
       renderGenreSummary();
       renderCandidates();
-    });
-    els.genreOptions.append(label);
+    }
+  });
+}
+
+function playerOptions() {
+  const options = [{ value: "", label: "Any count" }];
+  for (let count = 1; count <= 20; count += 1) {
+    options.push({ value: String(count), label: `${count} ${count === 1 ? "player" : "players"}` });
   }
-  renderGenreSummary();
+  return options;
+}
+
+function createFilterCombo({ name, input, options, emptyLabel, onChange, multi = false, selectedValues = null }) {
+  let combo = document.querySelector(`[data-filter-combo="${name}"]`);
+  const freshCombo = combo.cloneNode(true);
+  combo.replaceWith(freshCombo);
+  combo = freshCombo;
+  const toggle = combo.querySelector(".combo-toggle");
+  const panel = combo.querySelector(".combo-panel");
+  const search = combo.querySelector(".combo-search");
+  const optionsList = combo.querySelector(".combo-options");
+  if (name === "genres") {
+    els.genreSummary = toggle;
+    els.genreOptions = optionsList;
+  }
+  const isGenre = name === "genres";
+  let filterText = "";
+
+  function selectedLabel() {
+    if (multi) return genreSummaryText(emptyLabel);
+    const selected = options.find((option) => option.value === input.value);
+    return selected && selected.value ? selected.label : emptyLabel;
+  }
+
+  function render() {
+    const normalizedFilter = filterText.trim().toLowerCase();
+    const visibleOptions = options.filter((option) => option.label.toLowerCase().includes(normalizedFilter));
+    optionsList.innerHTML = "";
+
+    if (isGenre) {
+      const actions = document.createElement("div");
+      actions.className = "combo-actions";
+      const clear = document.createElement("button");
+      clear.type = "button";
+      clear.className = "combo-clear";
+      clear.textContent = "Clear all";
+      clear.disabled = !selectedValues.size;
+      clear.addEventListener("click", () => {
+        selectedValues.clear();
+        filterText = "";
+        search.value = "";
+        toggle.textContent = selectedLabel();
+        render();
+        onChange();
+      });
+      actions.append(clear);
+      optionsList.append(actions);
+    }
+
+    if (!visibleOptions.length) {
+      const empty = document.createElement("p");
+      empty.className = "filter-empty";
+      empty.textContent = options.length ? "No matches." : "No genre metadata imported yet.";
+      optionsList.append(empty);
+      return;
+    }
+
+    for (const option of visibleOptions) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "combo-option";
+      button.dataset.value = option.value;
+      const isSelected = multi ? selectedValues.has(option.value) : option.value === input.value;
+      button.setAttribute("aria-pressed", String(isSelected));
+      button.textContent = multi && isSelected ? `${option.label} ✓` : option.label;
+      button.addEventListener("click", () => {
+        if (multi) {
+          if (selectedValues.has(option.value)) {
+            selectedValues.delete(option.value);
+          } else {
+            selectedValues.add(option.value);
+          }
+          toggle.textContent = selectedLabel();
+          render();
+          onChange();
+          return;
+        }
+
+        input.value = option.value;
+        toggle.textContent = selectedLabel();
+        closeCombo(combo);
+        onChange();
+      });
+      optionsList.append(button);
+    }
+  }
+
+  toggle.textContent = selectedLabel();
+  toggle.addEventListener("click", () => {
+    if (panel.hidden) {
+      openCombo(combo);
+      filterText = "";
+      search.value = "";
+      render();
+      search.focus();
+    } else {
+      closeCombo(combo);
+    }
+  });
+
+  search.addEventListener("input", () => {
+    filterText = search.value;
+    render();
+  });
+
+  render();
+}
+
+function genreSummaryText(emptyLabel = "Any genre") {
+  if (!state.selectedGenres.size) return emptyLabel;
+  if (state.selectedGenres.size === 1) return [...state.selectedGenres][0];
+  return `${state.selectedGenres.size} genres selected`;
 }
 
 function renderGenreSummary() {
-  if (!state.selectedGenres.size) {
-    els.genreSummary.textContent = "Any genre";
-    return;
-  }
+  els.genreSummary.textContent = genreSummaryText();
+}
 
-  if (state.selectedGenres.size === 1) {
-    els.genreSummary.textContent = [...state.selectedGenres][0];
-    return;
-  }
+function openCombo(combo) {
+  closeAllCombos(combo);
+  combo.querySelector(".combo-panel").hidden = false;
+  const toggle = combo.querySelector(".combo-toggle");
+  const search = combo.querySelector(".combo-search");
+  toggle.hidden = true;
+  toggle.setAttribute("aria-expanded", "true");
+  search.hidden = false;
+}
 
-  els.genreSummary.textContent = `${state.selectedGenres.size} genres selected`;
+function closeCombo(combo) {
+  combo.querySelector(".combo-panel").hidden = true;
+  const toggle = combo.querySelector(".combo-toggle");
+  const search = combo.querySelector(".combo-search");
+  toggle.hidden = false;
+  toggle.setAttribute("aria-expanded", "false");
+  search.hidden = true;
+}
+
+function closeAllCombos(except = null) {
+  for (const combo of document.querySelectorAll(".filter-combo")) {
+    if (combo !== except) closeCombo(combo);
+  }
 }
 
 function matchingGames() {
@@ -141,6 +274,7 @@ function spin() {
   const maxTicks = 28 + Math.floor(Math.random() * 10);
 
   els.randomize.disabled = true;
+  els.randomizeHandle.disabled = true;
   els.winnerCard.hidden = true;
   els.slotReel.classList.add("spinning");
   els.status.textContent = "Spinning through your shelf.";
@@ -156,6 +290,7 @@ function spin() {
       state.spinTimer = null;
       els.slotReel.classList.remove("spinning");
       els.randomize.disabled = false;
+      els.randomizeHandle.disabled = false;
       showWinner(winner);
     }
   }, 85);
@@ -190,18 +325,18 @@ function clearWinner() {
   window.clearInterval(state.spinTimer);
   state.spinTimer = null;
   els.randomize.disabled = false;
+  els.randomizeHandle.disabled = false;
   els.slotReel.classList.remove("spinning");
   els.slotReel.innerHTML = `<div class="slot-item">Ready to spin</div>`;
   els.winnerCard.hidden = true;
 }
 
 function resetFilters() {
-  els.form.reset();
-  for (const checkbox of els.genreOptions.querySelectorAll("input")) {
-    checkbox.checked = false;
-  }
+  els.playerLimit.value = "";
+  els.complexityRange.value = "";
   state.selectedGenres.clear();
-  renderGenreSummary();
+  initializeCombos();
+  closeAllCombos();
   clearWinner();
   renderCandidates();
 }
@@ -221,9 +356,14 @@ function truncateTitle(value, maxLength) {
   return `${title.slice(0, maxLength - 3).trim()}...`;
 }
 
-els.playerLimit.addEventListener("change", renderCandidates);
-els.complexityRange.addEventListener("change", renderCandidates);
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".filter-combo")) {
+    closeAllCombos();
+  }
+});
+
 els.randomize.addEventListener("click", spin);
+els.randomizeHandle.addEventListener("click", spin);
 els.reset.addEventListener("click", resetFilters);
 
 loadRandomizer().catch((error) => {

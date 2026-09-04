@@ -3,6 +3,13 @@ const state = {
   genres: []
 };
 
+const complexityOptions = [
+  { value: "", label: "Any weight" },
+  { value: "2", label: "Light" },
+  { value: "3", label: "Medium or lighter" },
+  { value: "4", label: "Heavy or lighter" }
+];
+
 const els = {
   form: document.querySelector("#filters"),
   players: document.querySelector("#players"),
@@ -33,12 +40,153 @@ function filtersQuery() {
 async function loadGenres() {
   const data = await api("/api/genres");
   state.genres = data.genres;
-  els.genre.innerHTML = `<option value="">Any genre</option>`;
-  for (const genre of state.genres) {
-    const option = document.createElement("option");
-    option.value = genre;
-    option.textContent = genre;
-    els.genre.append(option);
+  initializeCombos();
+}
+
+function initializeCombos() {
+  createFilterCombo({
+    name: "players",
+    input: els.players,
+    options: playerOptions(),
+    emptyLabel: "Any count",
+    onChange: () => loadGames().catch(showError)
+  });
+
+  createFilterCombo({
+    name: "genre",
+    input: els.genre,
+    options: [{ value: "", label: "Any genre" }, ...state.genres.map((genre) => ({ value: genre, label: genre }))],
+    emptyLabel: "Any genre",
+    onChange: () => loadGames().catch(showError)
+  });
+
+  createFilterCombo({
+    name: "maxComplexity",
+    input: els.maxComplexity,
+    options: complexityOptions,
+    emptyLabel: "Any weight",
+    onChange: () => loadGames().catch(showError)
+  });
+}
+
+function playerOptions() {
+  const options = [{ value: "", label: "Any count" }];
+  for (let count = 1; count <= 20; count += 1) {
+    options.push({ value: String(count), label: `${count} ${count === 1 ? "player" : "players"}` });
+  }
+  return options;
+}
+
+function createFilterCombo({ name, input, options, emptyLabel, onChange }) {
+  let combo = document.querySelector(`[data-filter-combo="${name}"]`);
+  const freshCombo = combo.cloneNode(true);
+  combo.replaceWith(freshCombo);
+  combo = freshCombo;
+  const toggle = combo.querySelector(".combo-toggle");
+  const panel = combo.querySelector(".combo-panel");
+  const search = combo.querySelector(".combo-search");
+  const optionsList = combo.querySelector(".combo-options");
+  const isGenre = name === "genre";
+  let filterText = "";
+
+  function selectedLabel() {
+    const selected = options.find((option) => option.value === input.value);
+    return selected && selected.value ? selected.label : emptyLabel;
+  }
+
+  function render() {
+    const normalizedFilter = filterText.trim().toLowerCase();
+    const visibleOptions = options.filter((option) => option.label.toLowerCase().includes(normalizedFilter));
+    optionsList.innerHTML = "";
+
+    if (isGenre) {
+      const actions = document.createElement("div");
+      actions.className = "combo-actions";
+      const clear = document.createElement("button");
+      clear.type = "button";
+      clear.className = "combo-clear";
+      clear.textContent = "Clear all";
+      clear.disabled = !input.value;
+      clear.addEventListener("click", () => {
+        input.value = "";
+        filterText = "";
+        search.value = "";
+        toggle.textContent = selectedLabel();
+        render();
+        onChange();
+      });
+      actions.append(clear);
+      optionsList.append(actions);
+    }
+
+    if (!visibleOptions.length) {
+      const empty = document.createElement("p");
+      empty.className = "filter-empty";
+      empty.textContent = "No matches.";
+      optionsList.append(empty);
+      return;
+    }
+
+    for (const option of visibleOptions) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "combo-option";
+      button.dataset.value = option.value;
+      button.setAttribute("aria-pressed", String(option.value === input.value));
+      button.textContent = option.label;
+      button.addEventListener("click", () => {
+        input.value = option.value;
+        toggle.textContent = selectedLabel();
+        closeCombo(combo);
+        onChange();
+      });
+      optionsList.append(button);
+    }
+  }
+
+  toggle.textContent = selectedLabel();
+  toggle.addEventListener("click", () => {
+    if (panel.hidden) {
+      openCombo(combo);
+      filterText = "";
+      search.value = "";
+      render();
+      search.focus();
+    } else {
+      closeCombo(combo);
+    }
+  });
+
+  search.addEventListener("input", () => {
+    filterText = search.value;
+    render();
+  });
+
+  render();
+}
+
+function openCombo(combo) {
+  closeAllCombos(combo);
+  combo.querySelector(".combo-panel").hidden = false;
+  const toggle = combo.querySelector(".combo-toggle");
+  const search = combo.querySelector(".combo-search");
+  toggle.hidden = true;
+  toggle.setAttribute("aria-expanded", "true");
+  search.hidden = false;
+}
+
+function closeCombo(combo) {
+  combo.querySelector(".combo-panel").hidden = true;
+  const toggle = combo.querySelector(".combo-toggle");
+  const search = combo.querySelector(".combo-search");
+  toggle.hidden = false;
+  toggle.setAttribute("aria-expanded", "false");
+  search.hidden = true;
+}
+
+function closeAllCombos(except = null) {
+  for (const combo of document.querySelectorAll(".filter-combo")) {
+    if (combo !== except) closeCombo(combo);
   }
 }
 
@@ -100,8 +248,18 @@ els.form.addEventListener("submit", (event) => {
 });
 
 els.reset.addEventListener("click", () => {
-  els.form.reset();
+  els.players.value = "";
+  els.genre.value = "";
+  els.maxComplexity.value = "";
+  initializeCombos();
+  closeAllCombos();
   loadGames().catch(showError);
+});
+
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".filter-combo")) {
+    closeAllCombos();
+  }
 });
 
 function showError(error) {

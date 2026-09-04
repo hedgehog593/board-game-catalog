@@ -35,12 +35,20 @@
         <section class="import-bar" aria-label="Owned game import">
           <div>
             <strong>Owned games</strong>
-            <span id="importStatus">Upload your master CSV. Each import replaces the current catalog.</span>
+            <span id="importStatus">Upload your master CSV. Each import syncs changed rows and preserves existing BGG data.</span>
           </div>
           <form id="importForm" class="import-form">
             <input id="csvFile" name="file" type="file" accept=".csv,text/csv">
             <button type="submit">Import CSV</button>
           </form>
+        </section>
+
+        <section class="import-bar" aria-label="BGG refresh">
+          <div>
+            <strong>BGG refresh</strong>
+            <span id="refreshStatus">Update current catalog games that already have BGG IDs.</span>
+          </div>
+          <button type="button" id="refreshBgg">Refresh BGG Data</button>
         </section>
 
         <section class="summary" aria-live="polite">

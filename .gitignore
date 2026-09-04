@@ -8,6 +8,10 @@ data/bg_ranks.csv
 data/bgg_metadata.csv
 data/manual_metadata.csv
 data/manual_metadata_template.csv
+data/bgg_id_match_report.json
+data/board_games_catalog_with_bgg_ids.csv
+data/bgg_id_retry_report.json
+data/board_games_catalog_with_bgg_ids_retry.csv
 
 # Local admin credentials/session state
 service/config/admin_password.txt

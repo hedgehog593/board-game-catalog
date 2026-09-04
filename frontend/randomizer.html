@@ -23,26 +23,35 @@
         <form id="randomizerFilters" class="randomizer-controls">
           <label>
             Player count up to
-            <select id="playerLimit" name="playerLimit">
-              <option value="">Any count</option>
-            </select>
+            <input id="playerLimit" name="playerLimit" type="hidden">
+            <div class="filter-combo" data-filter-combo="playerLimit">
+              <button type="button" class="combo-toggle" aria-expanded="false">Any count</button>
+              <input class="combo-search" type="search" placeholder="Type to narrow counts" autocomplete="off" hidden>
+              <div class="combo-panel" hidden>
+                <div class="combo-options"></div>
+              </div>
+            </div>
           </label>
-          <fieldset class="genre-filter">
-            <legend>Genres</legend>
-            <details class="genre-dropdown" id="genreDropdown">
-              <summary id="genreSummary">Any genre</summary>
-              <div id="genreOptions" class="genre-options"></div>
-            </details>
-          </fieldset>
+          <div class="filter-field genre-filter">
+            <span class="filter-label">Genres</span>
+            <div class="filter-combo" data-filter-combo="genres" data-multi="true">
+              <button type="button" class="combo-toggle" id="genreSummary" aria-expanded="false">Any genre</button>
+              <input class="combo-search" type="search" placeholder="Type to narrow genres" autocomplete="off" hidden>
+              <div class="combo-panel" hidden>
+                <div id="genreOptions" class="combo-options"></div>
+              </div>
+            </div>
+          </div>
           <label>
             Complexity
-            <select id="complexityRange" name="complexityRange">
-              <option value="">Any complexity</option>
-              <option value="0-2">Light (0-2)</option>
-              <option value="2-3">Medium (2-3)</option>
-              <option value="3-4">Heavy (3-4)</option>
-              <option value="4-5">Very heavy (4-5)</option>
-            </select>
+            <input id="complexityRange" name="complexityRange" type="hidden">
+            <div class="filter-combo" data-filter-combo="complexityRange">
+              <button type="button" class="combo-toggle" aria-expanded="false">Any complexity</button>
+              <input class="combo-search" type="search" placeholder="Type to narrow complexity" autocomplete="off" hidden>
+              <div class="combo-panel" hidden>
+                <div class="combo-options"></div>
+              </div>
+            </div>
           </label>
           <button type="button" id="randomize">Randomize</button>
           <button type="button" id="clearRandomizer">Reset</button>
@@ -50,9 +59,20 @@
       </section>
 
       <section class="slot-machine" aria-live="polite">
-        <div class="slot-window">
-          <div class="slot-reel" id="slotReel">
-            <div class="slot-item">Ready to spin</div>
+        <div class="slot-cabinet">
+          <div class="slot-marquee">
+            <span>Game Night Picker</span>
+          </div>
+          <div class="slot-body">
+            <div class="slot-window">
+              <div class="slot-reel" id="slotReel">
+                <div class="slot-item">Ready to spin</div>
+              </div>
+            </div>
+            <button type="button" class="slot-handle" id="randomizeHandle" aria-label="Pull the randomizer handle">
+              <span class="handle-knob"></span>
+              <span class="handle-stem"></span>
+            </button>
           </div>
         </div>
         <div class="winner-card" id="winnerCard" hidden>
