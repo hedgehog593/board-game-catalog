@@ -88,7 +88,7 @@ def import_games(bgg_ids: list[int]) -> list[dict]:
     unique_ids = list(dict.fromkeys(bgg_ids))
     batches = chunks(unique_ids, MAX_IDS_PER_REQUEST)
     for index, batch in enumerate(batches):
-        query = urllib.parse.urlencode({"id": ",".join(map(str, batch)), "type": "boardgame", "stats": 1})
+        query = urllib.parse.urlencode({"id": ",".join(map(str, batch)), "stats": 1})
         root = fetch_xml(f"{BGG_THING_URL}?{query}")
         for item in root.findall("item"):
             imported.append(parse_game(item))
@@ -110,8 +110,8 @@ def parse_game(item: ET.Element) -> dict:
     return {
         "bgg_id": bgg_id,
         "name": primary_name.attrib["value"] if primary_name is not None else f"BGG {bgg_id}",
-        "min_players": int(attribute_value(item, "minplayers")),
-        "max_players": int(attribute_value(item, "maxplayers")),
+        "min_players": attribute_int_or_none(item, "minplayers"),
+        "max_players": attribute_int_or_none(item, "maxplayers"),
         "genres": categories[:5],
         "complexity": round(complexity, 2) if complexity is not None else None,
         "source_url": f"https://boardgamegeek.com/boardgame/{bgg_id}",
@@ -125,6 +125,13 @@ def attribute_value(item: ET.Element, tag_name: str) -> str:
     if element is None or "value" not in element.attrib:
         raise ValueError(f"Missing {tag_name} value for BGG item {item.attrib.get('id')}")
     return element.attrib["value"]
+
+
+def attribute_int_or_none(item: ET.Element, tag_name: str) -> int | None:
+    element = item.find(tag_name)
+    if element is None or "value" not in element.attrib:
+        return None
+    return int(element.attrib["value"])
 
 
 def text_or_none(element: ET.Element | None) -> str | None:

@@ -16,13 +16,15 @@ from urllib.parse import parse_qs, urlparse
 from catalog_db import (
     DB_PATH,
     api_game_to_record,
+    find_game_by_bgg_id,
     find_game_by_name,
     initialize_database,
     list_genres,
     query_games,
-    replace_games,
+    sync_games,
+    upsert_games,
 )
-from bgg_client import import_games, search_game_id
+from bgg_client import bgg_api_token, import_games
 
 HOST = os.environ.get("CATALOG_HOST", "127.0.0.1")
 PORT = int(os.environ.get("CATALOG_PORT", "8000"))
@@ -31,6 +33,7 @@ CONFIG_DIR = Path(__file__).resolve().parent / "config"
 PASSWORD_FILE = CONFIG_DIR / "admin_password.txt"
 SESSION_SECRET_FILE = CONFIG_DIR / "session_secret.txt"
 ADMIN_COOKIE = "board_game_admin"
+APP_VERSION = "1.1-sync-import"
 
 
 def parse_int(value: str | None) -> int | None:
@@ -55,7 +58,14 @@ class CatalogHandler(BaseHTTPRequestHandler):
             self.send_json({"genres": list_genres()})
             return
         if parsed.path == "/api/health":
-            self.send_json({"ok": True, "database": str(DB_PATH)})
+            self.send_json(
+                {
+                    "ok": True,
+                    "version": APP_VERSION,
+                    "database": str(DB_PATH),
+                    "bggTokenConfigured": bool(bgg_api_token()),
+                }
+            )
             return
         self.serve_static(parsed.path)
 
@@ -74,6 +84,11 @@ class CatalogHandler(BaseHTTPRequestHandler):
             if not self.require_admin():
                 return
             self.handle_csv_import()
+            return
+        if parsed.path == "/api/bgg/refresh":
+            if not self.require_admin():
+                return
+            self.handle_bgg_refresh()
             return
         self.send_error(404)
 
@@ -130,16 +145,26 @@ class CatalogHandler(BaseHTTPRequestHandler):
             self.send_json({"error": f"Import failed: {error}"}, status=502)
             return
 
-        replace_games(result["games"])
+        sync_result = sync_games(result["games"])
         self.send_json(
             {
-                "mode": "replace",
+                "mode": "sync",
                 "imported": len(result["games"]),
                 "matchedOnBgg": result["matched_on_bgg"],
                 "unmatched": result["unmatched"],
+                "removed": sync_result["removed"],
                 "bggUnavailable": False,
             }
         )
+
+    def handle_bgg_refresh(self) -> None:
+        try:
+            result = refresh_games_from_bgg()
+        except Exception as error:
+            self.send_json({"error": f"BGG refresh failed: {error}"}, status=502)
+            return
+
+        self.send_json(result)
 
     def read_uploaded_csv(self) -> str:
         content_type = self.headers.get("Content-Type", "")
@@ -283,11 +308,9 @@ def games_from_csv(csv_text: str) -> dict:
     if not rows:
         raise ValueError("The CSV must include a header row and at least one game.")
 
-    cached_games: list[dict] = []
-    bgg_ids: list[int] = []
-    rows_by_bgg_id: dict[int, tuple[dict[str, str], str | None]] = {}
-    fallback_games: list[dict] = []
+    imported_games: list[dict] = []
     unmatched: list[str] = []
+    matched_on_bgg = 0
 
     for row in rows:
         normalized = normalize_row(row)
@@ -295,46 +318,91 @@ def games_from_csv(csv_text: str) -> dict:
         bgg_id_text = first_value(normalized, "bggid", "bgg_id", "bbgid", "bbg_id", "objectid", "object_id")
         bgg_id = parse_bgg_id(bgg_id_text) if bgg_id_text else None
 
-        if bgg_id is not None:
-            bgg_ids.append(bgg_id)
-            rows_by_bgg_id[bgg_id] = (normalized, name)
-            continue
-
         if not name:
             continue
 
-        found_bgg_id = search_game_id(name)
-        if found_bgg_id is not None:
-            bgg_ids.append(found_bgg_id)
-            rows_by_bgg_id[found_bgg_id] = (normalized, name)
-            continue
+        if bgg_id is None:
+            cached = find_game_by_name(name)
+            if cached and cached.get("bggId") and cached["bggId"] > 0:
+                bgg_id = cached["bggId"]
 
-        unmatched.append(name)
-        fallback_games.append(fallback_game_from_csv(name, normalized, bgg_id=bgg_id))
+        game = preserve_existing_metadata(fallback_game_from_csv(name, normalized, bgg_id=bgg_id), name, bgg_id)
+        if game.get("source_url") and (game.get("complexity") is not None or game.get("genres")):
+            matched_on_bgg += 1
+        else:
+            unmatched.append(name)
+        imported_games.append(game)
 
-    if not bgg_ids and not fallback_games:
+    if not imported_games:
         raise ValueError("The CSV must include a name, game name, title, game, or bgg_id column.")
 
-    bgg_games = []
-    if bgg_ids:
-        imported_games = import_games(bgg_ids)
-        for game in imported_games:
-            row, owned_name = rows_by_bgg_id.get(game["bgg_id"], ({}, None))
-            bgg_games.append(merge_owned_row(game, row, owned_name, game["bgg_id"]))
-
-    for bgg_id, (row, name) in rows_by_bgg_id.items():
-        if any(game["bgg_id"] == bgg_id for game in bgg_games):
-            continue
-        if name:
-            unmatched.append(name)
-            fallback_games.append(fallback_game_from_csv(name, row, bgg_id=bgg_id))
-
-    games = dedupe_games(cached_games + bgg_games + fallback_games)
+    games = dedupe_games(imported_games)
     return {
         "games": games,
-        "matched_on_bgg": len(cached_games) + len(bgg_games),
+        "matched_on_bgg": matched_on_bgg,
         "unmatched": unmatched,
     }
+
+
+def refresh_games_from_bgg() -> dict:
+    current_games = query_games()
+    if not current_games:
+        return {"updated": 0, "skippedMissingIds": 0, "unmatched": []}
+
+    bgg_ids: list[int] = []
+    rows_by_bgg_id: dict[int, list[dict]] = {}
+    fallback_games: list[dict] = []
+    unmatched: list[str] = []
+    skipped_missing_ids = 0
+
+    for game in current_games:
+        bgg_id = refresh_bgg_id(game)
+        if bgg_id is not None:
+            bgg_ids.append(bgg_id)
+            rows_by_bgg_id.setdefault(bgg_id, []).append(game)
+            continue
+
+        skipped_missing_ids += 1
+        fallback_games.append(api_game_to_record(game))
+
+    refreshed_games = []
+    if bgg_ids:
+        for game in import_games(bgg_ids):
+            for current_game in rows_by_bgg_id.get(game["bgg_id"], []):
+                owned_bgg_id = current_game.get("bggId")
+                refreshed = merge_owned_row(game, {}, current_game["name"], owned_bgg_id)
+                if isinstance(owned_bgg_id, int) and owned_bgg_id < 0:
+                    refreshed["bgg_id"] = owned_bgg_id
+                    refreshed["source_url"] = game.get("source_url")
+                refreshed_games.append(refreshed)
+
+    refreshed_local_ids = {game["bgg_id"] for game in refreshed_games}
+    for current_games_for_bgg_id in rows_by_bgg_id.values():
+        for current_game in current_games_for_bgg_id:
+            if current_game["bggId"] not in refreshed_local_ids:
+                unmatched.append(current_game["name"])
+                fallback_games.append(api_game_to_record(current_game))
+
+    games = dedupe_games(refreshed_games + fallback_games)
+    upsert_games(games)
+    return {
+        "updated": len(refreshed_games),
+        "skippedMissingIds": skipped_missing_ids,
+        "unmatched": sorted(set(unmatched)),
+    }
+
+
+def refresh_bgg_id(game: dict) -> int | None:
+    bgg_id = game.get("bggId")
+    if isinstance(bgg_id, int) and bgg_id > 0:
+        return bgg_id
+
+    source_url = game.get("sourceUrl") or ""
+    marker = "boardgame/"
+    if marker not in source_url:
+        return None
+    value = source_url.split(marker, 1)[1].split("/", 1)[0]
+    return int(value) if value.isdigit() else None
 
 
 def normalize_row(row: dict[str, str]) -> dict[str, str]:
@@ -366,7 +434,7 @@ def has_bgg_metadata(game: dict) -> bool:
 
 def merge_owned_row(metadata_game: dict, row: dict[str, str], owned_name: str | None, owned_bgg_id: int | None) -> dict:
     merged = dict(metadata_game)
-    if owned_name and not merged.get("name"):
+    if owned_name:
         merged["name"] = owned_name
     if owned_bgg_id and (not merged.get("bgg_id") or merged["bgg_id"] < 0):
         merged["bgg_id"] = owned_bgg_id
@@ -378,7 +446,39 @@ def merge_owned_row(metadata_game: dict, row: dict[str, str], owned_name: str | 
             merged[key] = fallback[key]
     if not merged.get("genres"):
         merged["genres"] = fallback["genres"]
-    return merged
+    return preserve_existing_metadata(merged, owned_name, owned_bgg_id)
+
+
+def preserve_existing_metadata(game: dict, owned_name: str | None, owned_bgg_id: int | None) -> dict:
+    existing = existing_catalog_game(owned_name, owned_bgg_id)
+    if not existing:
+        return game
+
+    preserved = dict(game)
+    existing_record = api_game_to_record(existing)
+
+    for key in ("min_players", "max_players"):
+        if preserved.get(key) in (None, 1) and existing_record.get(key) not in (None, 1):
+            preserved[key] = existing_record[key]
+
+    for key in ("complexity", "source_url", "image_url", "thumbnail_url"):
+        if preserved.get(key) in (None, "") and existing_record.get(key) not in (None, ""):
+            preserved[key] = existing_record[key]
+
+    if not preserved.get("genres") and existing_record.get("genres"):
+        preserved["genres"] = existing_record["genres"]
+
+    return preserved
+
+
+def existing_catalog_game(owned_name: str | None, owned_bgg_id: int | None) -> dict | None:
+    if owned_bgg_id and owned_bgg_id > 0:
+        found = find_game_by_bgg_id(owned_bgg_id)
+        if found:
+            return found
+    if owned_name:
+        return find_game_by_name(owned_name)
+    return None
 
 
 def fallback_game_from_csv(name: str, row: dict[str, str], bgg_id: int | None = None) -> dict:
@@ -406,10 +506,23 @@ def dedupe_games(games: list[dict]) -> list[dict]:
     for game in games:
         key = game.get("bgg_id") if game.get("bgg_id") is not None else game["name"].casefold()
         if key in seen:
-            continue
+            game = dict(game)
+            source_bgg_id = game.get("bgg_id")
+            if isinstance(source_bgg_id, int) and source_bgg_id > 0:
+                game["source_url"] = game.get("source_url") or f"https://boardgamegeek.com/boardgame/{source_bgg_id}"
+            game["bgg_id"] = stable_local_id(game["name"], source_bgg_id)
+            key = game["bgg_id"]
+            while key in seen:
+                game["bgg_id"] -= 1
+                key = game["bgg_id"]
         seen.add(key)
         unique_games.append(game)
     return unique_games
+
+
+def stable_local_id(name: str, source_bgg_id: object) -> int:
+    seed = f"{name.casefold()}:{source_bgg_id}"
+    return -zlib.crc32(seed.encode("utf-8"))
 
 
 def main() -> None:

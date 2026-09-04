@@ -54,11 +54,43 @@ def replace_games(games: list[dict]) -> None:
         upsert_games(games, db)
 
 
+def sync_games(games: list[dict]) -> dict:
+    expected_bgg_ids = [game.get("bgg_id") for game in games if game.get("bgg_id") is not None]
+    with connect() as db:
+        before_count = db.execute("SELECT COUNT(*) FROM games").fetchone()[0]
+        upsert_games(games, db)
+
+        if expected_bgg_ids:
+            placeholders = ",".join("?" for _ in expected_bgg_ids)
+            db.execute(f"DELETE FROM games WHERE bgg_id NOT IN ({placeholders})", expected_bgg_ids)
+        else:
+            db.execute("DELETE FROM games")
+
+        db.execute(
+            """
+            DELETE FROM genres
+            WHERE id NOT IN (
+                SELECT DISTINCT genre_id
+                FROM game_genres
+            )
+            """
+        )
+        after_count = db.execute("SELECT COUNT(*) FROM games").fetchone()[0]
+        db.commit()
+
+    return {
+        "before": before_count,
+        "after": after_count,
+        "removed": max(before_count - after_count, 0),
+    }
+
+
 def upsert_games(games: list[dict], connection: sqlite3.Connection | None = None) -> None:
     owns_connection = connection is None
     db = connection or connect()
     try:
         for game in games:
+            game = preserve_metadata_for_write(db, game)
             complexity = game.get("complexity")
             db.execute(
                 """
@@ -111,6 +143,56 @@ def upsert_games(games: list[dict], connection: sqlite3.Connection | None = None
     finally:
         if owns_connection:
             db.close()
+
+
+def preserve_metadata_for_write(db: sqlite3.Connection, game: dict) -> dict:
+    existing = db.execute(
+        "SELECT * FROM games WHERE bgg_id = ?",
+        (game.get("bgg_id"),),
+    ).fetchone()
+    if existing is None:
+        existing = db.execute(
+            "SELECT * FROM games WHERE LOWER(name) = LOWER(?)",
+            (game["name"],),
+        ).fetchone()
+    if existing is None:
+        return game
+
+    preserved = dict(game)
+    for key, column in (
+        ("min_players", "min_players"),
+        ("max_players", "max_players"),
+    ):
+        if preserved.get(key) in (None, 1) and existing[column] not in (None, 1):
+            preserved[key] = existing[column]
+
+    for key, column in (
+        ("complexity", "complexity"),
+        ("source_url", "source_url"),
+        ("image_url", "image_url"),
+        ("thumbnail_url", "thumbnail_url"),
+    ):
+        if preserved.get(key) in (None, "") and existing[column] not in (None, ""):
+            preserved[key] = existing[column]
+
+    if not preserved.get("genres"):
+        genres = [
+            row["name"]
+            for row in db.execute(
+                """
+                SELECT ge.name
+                FROM game_genres gg
+                JOIN genres ge ON ge.id = gg.genre_id
+                WHERE gg.game_id = ?
+                ORDER BY ge.name COLLATE NOCASE
+                """,
+                (existing["id"],),
+            ).fetchall()
+        ]
+        if genres:
+            preserved["genres"] = genres
+
+    return preserved
 
 
 def row_to_game(row: sqlite3.Row) -> dict:
