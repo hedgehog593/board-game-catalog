@@ -8,6 +8,26 @@ Local-first board game catalog starter with:
 - BoardGameGeek XML API metadata enrichment using a local token file.
 - Browser CSV upload for syncing the catalog with your owned games.
 
+## Screenshots
+
+These screenshots use the bundled sample games, not a personal owned-game catalog.
+
+### Finder
+
+![Finder with player, genre, and complexity filters above the sample catalog](docs/screenshots/finder.png)
+
+### Randomizer
+
+![Slot machine randomizer with a genre filter and a selected game](docs/screenshots/randomizer.png)
+
+### Admin
+
+![Admin tools for CSV import and BGG metadata refresh using sample games](docs/screenshots/admin.png)
+
+To regenerate these images after installing the test dependencies and Chromium,
+run `python tools/capture_screenshots.py`. The capture uses disposable test
+credentials and a temporary database without contacting BGG.
+
 ## Why SQLite
 
 SQLite is the best starting database for this project because it is portable, requires no server install, works well for a personal catalog, and can later be migrated to SQL Server or PostgreSQL if the app grows.
