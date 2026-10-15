@@ -1,0 +1,24 @@
+name: Build and test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      live_bgg:
+        description: Run live BGG integration test (requires BGG_API_TOKEN secret)
+        type: boolean
+        default: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build with API and browser tests
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          build-args: RUN_LIVE_BGG_TESTS=${{ inputs.live_bgg && '1' || '0' }}
+          secrets: |
+            bgg_api_token=${{ secrets.BGG_API_TOKEN }}

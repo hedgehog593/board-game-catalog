@@ -1,5 +1,7 @@
 __pycache__/
 *.py[cod]
+.venv/
+test-results/
 
 # Local catalog/runtime data
 data/*.sqlite

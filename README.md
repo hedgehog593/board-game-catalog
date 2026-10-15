@@ -17,7 +17,7 @@ SQLite is the best starting database for this project because it is portable, re
 From this folder:
 
 ```powershell
-C:\Users\hedge\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe .\service\api.py
+python .\service\api.py
 ```
 
 Open:
@@ -87,7 +87,7 @@ To have it come back after a computer restart, enable Docker Desktop's setting t
 To access the site from another device on your home network, use the hosting computer's LAN address. For example:
 
 ```text
-http://192.168.1.3:8000
+http://<hosting-computer-LAN-IP>:8000
 ```
 
 Windows Firewall must allow inbound TCP traffic on port `8000` for the private network profile. From an elevated PowerShell window:
@@ -160,6 +160,51 @@ Use the Admin `Refresh BGG Data` button to update current catalog games that alr
 - CSV import syncs ownership only. It preserves existing BGG metadata, but it does not pull fresh BGG metadata by itself.
 - After importing the CSV, click `Refresh BGG Data` in Admin to fetch players, genres, complexity, images, and BGG source links for rows that have BGG IDs.
 - Keep BGG IDs in the CSV where possible. Title-only matching is useful, but BGG IDs avoid ambiguous names and edition mix-ups.
+
+## Automated Tests
+
+Every Docker image build runs the API suite and Chromium user journeys before
+creating the runtime image. A failing test fails the build. The tests use a
+temporary SQLite database, test credentials, and simulated BGG responses; they
+never change your owned catalog or contact BGG during an ordinary build.
+Docker can reuse a passing cached test layer when the source is unchanged.
+
+Coverage includes Finder searching/filtering/reset, Randomizer handle and
+filtered selection, empty results, Admin login/import/refresh/reimport/logout,
+desktop/mobile dropdown stacking, authentication, invalid imports, duplicate
+rows, metadata preservation, and BGG parsing, batching, retries and failures.
+
+```powershell
+docker compose build
+# Force a fresh test run even if the source has not changed:
+docker compose build --no-cache
+# Live BGG fetch and DB refresh, in addition to the ordinary tests:
+docker build --no-cache --build-arg RUN_LIVE_BGG_TESTS=1 --secret id=bgg_api_token,src=service/config/bgg_api_token.txt -t board-game-catalog .
+```
+
+The live check fetches CATAN (BGG ID 13), verifies its metadata in a disposable
+database, and checks that reimport preserves it. It requires network access and
+a valid token; BGG outages or authorization failures fail that explicit build.
+The token is mounted as a BuildKit secret, not copied into an image layer.
+
+To run outside Docker (Python 3.12+):
+
+```powershell
+python -m venv .venv
+.venv/Scripts/python -m pip install -r tests/requirements.txt
+.venv/Scripts/python -m playwright install chromium
+.venv/Scripts/python -m unittest discover -s tests -p "test_*.py" -v
+# API tests alone do not require Playwright:
+python -m unittest discover -s tests -p "test_api.py" -v
+python tests/live_bgg.py
+```
+
+Browser runs save screenshots and Playwright traces to ignored `test-results/`.
+Open a trace with `python -m playwright show-trace <trace.zip>`.
+GitHub Actions builds and tests pushes and pull requests. For live BGG testing,
+add a repository Actions secret named `BGG_API_TOKEN` and manually run the
+workflow with `live_bgg` enabled. Test tools remain in the build stage; the
+running site stays dependency-light.
 
 ## IIS Starting Point
 
